@@ -15,13 +15,18 @@ import (
 type CyberPower struct {
 	hostpath  string
 	loginForm url.Values
-	client    *http.Client
-	ups       *UPS
-	env       *ENV
+	client    http.Client
+	ups       UPS
+	env       ENV
 }
 
 func FromENV() *CyberPower {
-	return NewCyberPower(os.Getenv("CYBERPOWER_HOST"), os.Getenv("CYBERPOWER_USERNAME"), os.Getenv("CYBERPOWER_PASSWORD"))
+	c := NewCyberPower(os.Getenv("CYBERPOWER_HOST"), os.Getenv("CYBERPOWER_USERNAME"), os.Getenv("CYBERPOWER_PASSWORD"))
+	if c == nil {
+		log.Print("unable to create cyberpower from environment variables")
+		return nil
+	}
+	return c
 }
 
 func NewCyberPower(host string, username string, password string) *CyberPower {
@@ -34,7 +39,7 @@ func NewCyberPower(host string, username string, password string) *CyberPower {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c.client = &http.Client{
+	c.client = http.Client{
 		Jar: j,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -43,10 +48,10 @@ func NewCyberPower(host string, username string, password string) *CyberPower {
 	if !(c.login()) {
 		return nil
 	}
-	c.ups = &UPS{
+	c.ups = UPS{
 		parent: c,
 	}
-	c.env = &ENV{
+	c.env = ENV{
 		parent: c,
 	}
 	cyberpowers = append(cyberpowers, *c)

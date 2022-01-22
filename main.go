@@ -12,7 +12,8 @@ var apiListenerPort = ":8080"
 var configfilepath = "/etc/cyberpower/config.yaml"
 
 func main() {
-	cyberpower.FromENV()
+	var devices []*cyberpower.CyberPower
+	devices = append(devices, cyberpower.FromENV())
 
 	if os.Getenv("CYBERPOWER_CONFIG") != "" {
 		configfilepath = os.Getenv("CYBERPOWER_CONFIG")
@@ -23,7 +24,11 @@ func main() {
 	}
 
 	for _, conf := range read_config(configfilepath).cyberpower {
-		cyberpower.NewCyberPower(conf.host, conf.username, conf.password)
+		devices = append(devices, cyberpower.NewCyberPower(conf.host, conf.username, conf.password))
+	}
+
+	if len(devices) == 0 {
+		log.Fatal("unable to find any devices")
 	}
 
 	http.HandleFunc("/v1/cyberpower", cyberpower.RestGetHandler)

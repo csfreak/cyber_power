@@ -7,8 +7,8 @@ import (
 
 type device struct {
 	Host        string
-	UPS         *UPS
-	Environment *ENV
+	UPS         UPS
+	Environment ENV
 }
 
 var (
@@ -21,8 +21,9 @@ func RestGetHandler(res http.ResponseWriter, req *http.Request) {
 	} else {
 		var outdata []device
 		for _, c := range cyberpowers {
+			//c.login()
 			c.Update()
-			c.Logout()
+			//c.Logout()
 			d := device{
 				UPS:         c.ups,
 				Environment: c.env,
