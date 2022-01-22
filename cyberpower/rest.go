@@ -21,6 +21,8 @@ func RestGetHandler(res http.ResponseWriter, req *http.Request) {
 	} else {
 		var outdata []device
 		for _, c := range cyberpowers {
+			c.Update()
+			c.Logout()
 			d := device{
 				UPS:         c.ups,
 				Environment: c.env,

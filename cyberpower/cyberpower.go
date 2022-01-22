@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/publicsuffix"
@@ -17,6 +18,10 @@ type CyberPower struct {
 	client    *http.Client
 	ups       *UPS
 	env       *ENV
+}
+
+func FromENV() *CyberPower {
+	return NewCyberPower(os.Getenv("CYBERPOWER_HOST"), os.Getenv("CYBERPOWER_USERNAME"), os.Getenv("CYBERPOWER_PASSWORD"))
 }
 
 func NewCyberPower(host string, username string, password string) *CyberPower {
@@ -36,7 +41,7 @@ func NewCyberPower(host string, username string, password string) *CyberPower {
 		},
 	}
 	if !(c.login()) {
-		log.Panic("unable to login")
+		return nil
 	}
 	c.ups = &UPS{
 		parent: c,
