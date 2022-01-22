@@ -11,33 +11,33 @@ import (
 
 type UPS struct {
 	parent  *CyberPower
-	input   INPUT_POWER
-	output  OUTPUT_POWER
-	battery BATTERY_POWER
-	temp_c  int
-	temp_f  int
-	status  string
+	Input   INPUT_POWER
+	Output  OUTPUT_POWER
+	Battery BATTERY_POWER
+	Temp_c  int
+	Temp_f  int
+	Status  string
 }
 
 type INPUT_POWER struct {
-	status    string
-	voltage   float64
-	frequency float64
+	Status    string
+	Voltage   float64
+	Frequency float64
 }
 
 type OUTPUT_POWER struct {
-	status       string
-	voltage      float64
-	frequency    float64
-	current      float64
-	load_watts   int
-	load_percent int
+	Status      string
+	Voltage     float64
+	Frequency   float64
+	Current     float64
+	LoadWatts   int
+	LoadPercent int
 }
 
 type BATTERY_POWER struct {
-	status             string
-	remaining_capacity int
-	remaining_runtime  int
+	Status            string
+	RemainingCapacity int
+	RemainingRuntime  int
 }
 
 var ups_path = "/status_update.html"
@@ -96,13 +96,13 @@ func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
 				case "Status":
 					switch label_group.FirstChild.Data {
 					case "Input":
-						u.input.status = curr_item.FirstChild.Data
+						u.Input.Status = curr_item.FirstChild.Data
 					case "Output":
-						u.output.status = curr_item.FirstChild.Data
+						u.Output.Status = curr_item.FirstChild.Data
 					case "Battery":
-						u.battery.status = curr_item.FirstChild.Data
+						u.Battery.Status = curr_item.FirstChild.Data
 					case "System":
-						u.status = curr_item.FirstChild.Data
+						u.Status = curr_item.FirstChild.Data
 					}
 				case "Remaining Capacity":
 					cs := curr_item.FirstChild.Data
@@ -114,7 +114,7 @@ func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
 					}
 					switch label_group.FirstChild.Data {
 					case "Battery":
-						u.battery.remaining_capacity = rc
+						u.Battery.RemainingCapacity = rc
 					}
 				case "Remaining Runtime":
 					rs := runtime_regex.FindString(curr_item.FirstChild.Data)
@@ -126,7 +126,7 @@ func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
 					}
 					switch label_group.FirstChild.Data {
 					case "Battery":
-						u.battery.remaining_runtime = rr
+						u.Battery.RemainingRuntime = rr
 					}
 				case "Temperature":
 					ts := temperature_regex.FindStringSubmatch(curr_item.FirstChild.Data)
@@ -147,8 +147,8 @@ func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
 					}
 					switch label_group.FirstChild.Data {
 					case "System":
-						u.temp_c = tc
-						u.temp_f = tf
+						u.Temp_c = tc
+						u.Temp_f = tf
 					}
 
 				}
@@ -166,9 +166,9 @@ func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
 					}
 					switch label_group.FirstChild.Data {
 					case "Input":
-						u.input.voltage = v
+						u.Input.Voltage = v
 					case "Output":
-						u.output.voltage = v
+						u.Output.Voltage = v
 					}
 				case "Frequency":
 					fs := curr_item.FirstChild.Data
@@ -180,9 +180,9 @@ func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
 					}
 					switch label_group.FirstChild.Data {
 					case "Input":
-						u.input.frequency = f
+						u.Input.Frequency = f
 					case "Output":
-						u.output.frequency = f
+						u.Output.Frequency = f
 					}
 				case "Current":
 					cs := curr_item.FirstChild.Data
@@ -194,7 +194,7 @@ func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
 					}
 					switch label_group.FirstChild.Data {
 					case "Output":
-						u.output.current = c
+						u.Output.Current = c
 					}
 				case "Load":
 					ls := curr_item.FirstChild.Data
@@ -211,8 +211,8 @@ func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
 					}
 					switch label_group.FirstChild.Data {
 					case "Output":
-						u.output.load_percent = lp
-						u.output.load_watts = lw
+						u.Output.LoadPercent = lp
+						u.Output.LoadWatts = lw
 					}
 				}
 			}

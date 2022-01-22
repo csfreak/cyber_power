@@ -44,7 +44,7 @@ func NewCyberPower(host string, username string, password string) *CyberPower {
 	c.env = &ENV{
 		parent: c,
 	}
-
+	cyberpowers = append(cyberpowers, *c)
 	return c
 }
 
@@ -74,6 +74,5 @@ func (c *CyberPower) get(path string) (*html.Node, error) {
 
 func (c *CyberPower) Update() {
 	c.ups.update()
-	log.Println(c.ups)
 	c.env.update()
 }

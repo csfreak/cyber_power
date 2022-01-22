@@ -10,10 +10,10 @@ import (
 
 type ENV struct {
 	parent   *CyberPower
-	name     string
-	location string
-	temp_f   float64
-	humidity int
+	Name     string
+	Location string
+	Temp_f   float64
+	Humidity int
 }
 
 var env_path = "/env_status_update.html"
@@ -68,9 +68,9 @@ func process_env_group(group *html.Node, label_group *html.Node, e *ENV) {
 			if !(label_item == nil) {
 				switch label_item.FirstChild.Data {
 				case "Name":
-					e.name = curr_item.FirstChild.Data
+					e.Name = curr_item.FirstChild.Data
 				case "Location":
-					e.location = curr_item.FirstChild.Data
+					e.Location = curr_item.FirstChild.Data
 
 				}
 			}
@@ -87,7 +87,7 @@ func process_env_group(group *html.Node, label_group *html.Node, e *ENV) {
 							log.Printf("Unable to parse Current Value for %s", label_group.FirstChild.Data)
 							break
 						}
-						e.temp_f = t
+						e.Temp_f = t
 					case "Humidity":
 						hs := curr_item.FirstChild.Data
 						hs = strings.Split(hs, " ")[0]
@@ -96,7 +96,7 @@ func process_env_group(group *html.Node, label_group *html.Node, e *ENV) {
 							log.Printf("Unable to parse Current Value for %s", label_group.FirstChild.Data)
 							break
 						}
-						e.humidity = f
+						e.Humidity = f
 					}
 
 				}
