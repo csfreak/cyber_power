@@ -65,7 +65,7 @@ func (u *UPS) update() {
 			}
 		case "div":
 			if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "gap" {
-				process_group(curr_group, label_group, u)
+				process_ups_group(curr_group, label_group, u)
 
 			}
 		}
@@ -75,7 +75,7 @@ func (u *UPS) update() {
 
 }
 
-func process_group(group *html.Node, label_group *html.Node, u *UPS) {
+func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
 	curr_item := group.FirstChild
 	var label_item *html.Node
 	for {
@@ -217,7 +217,7 @@ func process_group(group *html.Node, label_group *html.Node, u *UPS) {
 				}
 			}
 		} else if curr_item.Attr[0].Key == "class" && strings.Trim(curr_item.Attr[0].Val, " ") == "" {
-			process_group(curr_item, label_group, u)
+			process_ups_group(curr_item, label_group, u)
 		}
 		curr_item = curr_item.NextSibling
 		continue
