@@ -34,10 +34,12 @@ func (c *CyberPower) login() bool {
 		return false
 	}
 	log.Printf("Login Successful to %s", c.hostpath)
+	c.logged_in = true
 	return true
 }
 
 func (c *CyberPower) Logout() {
 	c.client.Get(c.hostpath + "/logout.html")
 	log.Printf("Logout from %s", c.hostpath)
+	c.logged_in = false
 }

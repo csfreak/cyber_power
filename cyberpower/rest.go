@@ -12,7 +12,7 @@ type device struct {
 }
 
 var (
-	cyberpowers []CyberPower
+	cyberpowers []*CyberPower
 )
 
 func RestGetHandler(res http.ResponseWriter, req *http.Request) {
@@ -21,9 +21,7 @@ func RestGetHandler(res http.ResponseWriter, req *http.Request) {
 	} else {
 		var outdata []device
 		for _, c := range cyberpowers {
-			//c.login()
 			c.Update()
-			//c.Logout()
 			d := device{
 				UPS:         c.ups,
 				Environment: c.env,

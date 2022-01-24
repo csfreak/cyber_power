@@ -27,6 +27,13 @@ func main() {
 		devices = append(devices, cyberpower.NewCyberPower(conf.host, conf.username, conf.password))
 	}
 
+	for i, c := range devices {
+		if c == nil && len(devices) > 1 {
+			devices = append(devices[:i], devices[i+1:]...)
+		} else if c == nil && len(devices) <= 1 {
+			devices = make([]*cyberpower.CyberPower, 0)
+		}
+	}
 	if len(devices) == 0 {
 		log.Fatal("unable to find any devices")
 	}

@@ -18,6 +18,7 @@ type CyberPower struct {
 	client    http.Client
 	ups       UPS
 	env       ENV
+	logged_in bool
 }
 
 func FromENV() *CyberPower {
@@ -45,7 +46,8 @@ func NewCyberPower(host string, username string, password string) *CyberPower {
 			return http.ErrUseLastResponse
 		},
 	}
-	if !(c.login()) {
+	c.logged_in = c.login()
+	if !(c.logged_in) {
 		return nil
 	}
 	c.ups = UPS{
@@ -54,26 +56,21 @@ func NewCyberPower(host string, username string, password string) *CyberPower {
 	c.env = ENV{
 		parent: c,
 	}
-	cyberpowers = append(cyberpowers, *c)
+	cyberpowers = append(cyberpowers, c)
 	return c
 }
 
 func (c *CyberPower) get(path string) (*html.Node, error) {
+	if !(c.logged_in) {
+		if !(c.login()) {
+			return nil, fmt.Errorf("unable to login")
+		}
+	}
 	resp, err := c.client.Get(c.hostpath + path)
 	if err != nil {
 		return nil, err
 	}
 
-	if resp.StatusCode == http.StatusSeeOther || resp.StatusCode == http.StatusForbidden {
-		if c.login() {
-			resp, err = c.client.Get(c.hostpath + path)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, fmt.Errorf("unable to login")
-		}
-	}
 	defer resp.Body.Close()
 	node, err := html.Parse(resp.Body)
 	if err != nil {
@@ -85,4 +82,5 @@ func (c *CyberPower) get(path string) (*html.Node, error) {
 func (c *CyberPower) Update() {
 	c.ups.update()
 	c.env.update()
+	c.Logout()
 }

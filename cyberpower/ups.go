@@ -46,31 +46,32 @@ var temperature_regex = regexp.MustCompile(`^([0-9]+)°C([0-9]+)°F`)
 
 func (u *UPS) update() {
 	root, err := u.parent.get(ups_path)
-	if err != nil {
+	if err == nil {
+
+		body := root.FirstChild.LastChild
+
+		curr_group := body.FirstChild
+		var label_group *html.Node
+		for {
+			if curr_group == nil {
+				break
+			}
+			switch curr_group.Data {
+			case "span":
+				if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "caption" {
+					label_group = curr_group
+				}
+			case "div":
+				if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "gap" {
+					process_ups_group(curr_group, label_group, u)
+
+				}
+			}
+
+			curr_group = curr_group.NextSibling
+		}
+	} else {
 		log.Printf("Unable to update UPS on %s", u.parent.hostpath)
-	}
-
-	body := root.FirstChild.LastChild
-
-	curr_group := body.FirstChild
-	var label_group *html.Node
-	for {
-		if curr_group == nil {
-			break
-		}
-		switch curr_group.Data {
-		case "span":
-			if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "caption" {
-				label_group = curr_group
-			}
-		case "div":
-			if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "gap" {
-				process_ups_group(curr_group, label_group, u)
-
-			}
-		}
-
-		curr_group = curr_group.NextSibling
 	}
 
 }
