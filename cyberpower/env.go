@@ -84,7 +84,9 @@ func process_env_group(group *html.Node, label_group *html.Node, e *ENV) {
 						ts = strings.Trim(ts, " ")
 						t, err := strconv.ParseFloat(ts, 64)
 						if err != nil {
-							log.Printf("Unable to parse Current Value for %s", label_group.FirstChild.Data)
+							if !(curr_item.PrevSibling.Attr[0].Key == "class" && strings.Trim(curr_item.PrevSibling.Attr[0].Val, " ") == "txt3") {
+								log.Printf("Unable to parse Current Value for %s", label_group.FirstChild.Data)
+							}
 							break
 						}
 						e.Temp_f = t
