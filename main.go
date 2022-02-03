@@ -9,23 +9,24 @@ import (
 )
 
 var apiListenerPort = ":8080"
-var configfilepath = "/etc/cyberpower/config.yaml"
+
+//var configfilepath = "/etc/cyberpower/config.yaml"
 
 func main() {
 	var devices []*cyberpower.CyberPower
 	devices = append(devices, cyberpower.FromENV())
 
-	if os.Getenv("CYBERPOWER_CONFIG") != "" {
+	/*if os.Getenv("CYBERPOWER_CONFIG") != "" {
 		configfilepath = os.Getenv("CYBERPOWER_CONFIG")
-	}
+	}*/
 
 	if os.Getenv("CYBERPOWER_PORT") != "" {
 		apiListenerPort = ":" + os.Getenv("CYBERPOWER_PORT")
 	}
 
-	for _, conf := range read_config(configfilepath).cyberpower {
-		devices = append(devices, cyberpower.NewCyberPower(conf.host, conf.username, conf.password))
-	}
+	/*for _, conf := range cyberpower.ReadConfig(configfilepath).Cyberpower {
+		devices = append(devices, cyberpower.NewCyberPower(conf.Host, conf.Username, conf.Password))
+	}*/
 
 	for i, c := range devices {
 		if c == nil && len(devices) > 1 {
