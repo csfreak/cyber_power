@@ -41,7 +41,7 @@ type BATTERY_POWER struct {
 }
 
 var ups_path = "/status_update.html"
-var runtime_regex = regexp.MustCompile(`^[0-5]+`)
+var runtime_regex = regexp.MustCompile(`^([0-5]+)min.`)
 var temperature_regex = regexp.MustCompile(`^([0-9]+)°C([0-9]+)°F`)
 
 func (u *UPS) update() {
@@ -118,8 +118,12 @@ func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
 						u.Battery.RemainingCapacity = rc
 					}
 				case "Remaining Runtime":
-					rs := runtime_regex.FindString(curr_item.FirstChild.Data)
-					rr, err := strconv.Atoi(rs)
+					rs := runtime_regex.FindStringSubmatch(curr_item.FirstChild.Data)
+					if len(rs) != 2 {
+						log.Printf("Unable to parse Tempurature for %s", label_group.FirstChild.Data)
+						break
+					}
+					rr, err := strconv.Atoi(rs[1])
 					rr = rr * 60
 					if err != nil {
 						log.Printf("Unable to parse Remaining Runtime for %s", label_group.FirstChild.Data)
