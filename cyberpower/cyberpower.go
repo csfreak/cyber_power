@@ -34,6 +34,7 @@ func NewCyberPower(host string, username string, password string) *CyberPower {
 	c := &CyberPower{}
 	c.hostpath = "http://" + host
 	c.loginForm = url.Values{}
+	c.loginForm.Set("action", "LOGIN")
 	c.loginForm.Set("username", username)
 	c.loginForm.Set("password", password)
 	j, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
