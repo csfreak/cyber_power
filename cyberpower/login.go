@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-func (c *CyberPower) login() bool {
+func (c *CP) login() bool {
 	resp, err := c.client.Get(c.hostpath + "/login.html")
 	if err != nil {
 		log.Println(err)
@@ -73,12 +73,15 @@ func (c *CyberPower) login() bool {
 		return false
 	}
 	log.Printf("Login Successful to %s", c.hostpath)
-	c.logged_in = true
+	c._logged_in = true
 	return true
 }
 
-func (c *CyberPower) Logout() {
+func (c *CP) logout() {
+	if !c._logged_in {
+		return
+	}
 	c.client.Get(c.hostpath + "/logout.html")
 	log.Printf("Logout from %s", c.hostpath)
-	c.logged_in = false
+	c._logged_in = false
 }

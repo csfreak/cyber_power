@@ -12,26 +12,17 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-type CyberPower struct {
-	hostpath  string
-	loginForm url.Values
-	client    http.Client
-	ups       UPS
-	env       ENV
-	logged_in bool
-}
-
-func FromENV() *CyberPower {
-	c := NewCyberPower(os.Getenv("CYBERPOWER_HOST"), os.Getenv("CYBERPOWER_USERNAME"), os.Getenv("CYBERPOWER_PASSWORD"))
-	if c == nil {
+func FromENV(validate bool) (CyberPower, error) {
+	c, err := NewCyberPower(os.Getenv("CYBERPOWER_HOST"), os.Getenv("CYBERPOWER_USERNAME"), os.Getenv("CYBERPOWER_PASSWORD"), validate)
+	if err != nil {
 		log.Print("unable to create cyberpower from environment variables")
-		return nil
+		return c, err
 	}
-	return c
+	return c, nil
 }
 
-func NewCyberPower(host string, username string, password string) *CyberPower {
-	c := &CyberPower{}
+func NewCyberPower(host string, username string, password string, validate bool) (CyberPower, error) {
+	c := &CP{}
 	c.hostpath = "http://" + host
 	c.loginForm = url.Values{}
 	c.loginForm.Set("action", "LOGIN")
@@ -39,7 +30,7 @@ func NewCyberPower(host string, username string, password string) *CyberPower {
 	c.loginForm.Set("password", password)
 	j, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
-		log.Fatal(err)
+		return c, err
 	}
 	c.client = http.Client{
 		Jar: j,
@@ -47,22 +38,24 @@ func NewCyberPower(host string, username string, password string) *CyberPower {
 			return http.ErrUseLastResponse
 		},
 	}
-	c.logged_in = c.login()
-	if !(c.logged_in) {
-		return nil
+	if validate {
+		if !(c.login()) {
+			return c, fmt.Errorf("unable to login to %s as %s", c.hostpath, username)
+		}
 	}
-	c.ups = UPS{
+
+	c.ups = &UPS{
 		parent: c,
 	}
-	c.env = ENV{
+	c.env = &ENV{
 		parent: c,
 	}
 	cyberpowers = append(cyberpowers, c)
-	return c
+	return c, nil
 }
 
-func (c *CyberPower) get(path string) (*html.Node, error) {
-	if !(c.logged_in) {
+func (c *CP) get(path string) (*html.Node, error) {
+	if !(c._logged_in) {
 		if !(c.login()) {
 			return nil, fmt.Errorf("unable to login")
 		}
@@ -80,8 +73,34 @@ func (c *CyberPower) get(path string) (*html.Node, error) {
 	return node, nil
 }
 
-func (c *CyberPower) Update() {
-	c.ups.update()
-	c.env.update()
-	c.Logout()
+func (c *CP) logged_in() bool {
+	return c._logged_in
+}
+
+func (c *CP) getHost() string {
+	return c.hostpath[7:]
+}
+
+func (c *CP) getEnv() (*ENV, bool) {
+	env, ok := c.env.(*ENV)
+	return env, ok
+
+}
+
+func (c *CP) getUps() (*UPS, bool) {
+	ups, ok := c.ups.(*UPS)
+	return ups, ok
+}
+
+func (c *CP) update() error {
+	err := c.ups.update()
+	if err != nil {
+		return err
+	}
+	err = c.env.update()
+	if err != nil {
+		return err
+	}
+	c.logout()
+	return nil
 }

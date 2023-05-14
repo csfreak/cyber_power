@@ -1,6 +1,7 @@
 package cyberpower
 
 import (
+	"fmt"
 	"log"
 	"regexp"
 	"strconv"
@@ -9,71 +10,44 @@ import (
 	"golang.org/x/net/html"
 )
 
-type UPS struct {
-	parent  *CyberPower
-	Input   INPUT_POWER
-	Output  OUTPUT_POWER
-	Battery BATTERY_POWER
-	Temp_c  int
-	Temp_f  int
-	Status  string
-}
-
-type INPUT_POWER struct {
-	Status    string
-	Voltage   float64
-	Frequency float64
-}
-
-type OUTPUT_POWER struct {
-	Status      string
-	Voltage     float64
-	Frequency   float64
-	Current     float64
-	LoadWatts   int
-	LoadPercent int
-}
-
-type BATTERY_POWER struct {
-	Status            string
-	RemainingCapacity int
-	RemainingRuntime  int
-}
-
 var ups_path = "/status_update.html"
 var runtime_regex = regexp.MustCompile(`^([0-9]+)min.`)
 var temperature_regex = regexp.MustCompile(`^([0-9]+)°C([0-9]+)°F`)
 
-func (u *UPS) update() {
+func (u UPS) update() error {
 	root, err := u.parent.get(ups_path)
-	if err == nil {
+	if err != nil {
+		return fmt.Errorf("unable to update UPS on %s; %v", u.parent.getHost(), err)
+	}
+	body := root.FirstChild.LastChild
 
-		body := root.FirstChild.LastChild
-
-		curr_group := body.FirstChild
-		var label_group *html.Node
-		for {
-			if curr_group == nil {
-				break
-			}
-			switch curr_group.Data {
-			case "span":
-				if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "caption" {
-					label_group = curr_group
-				}
-			case "div":
-				if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "gap" {
-					process_ups_group(curr_group, label_group, u)
-
-				}
-			}
-
-			curr_group = curr_group.NextSibling
+	curr_group := body.FirstChild
+	var label_group *html.Node
+	for {
+		if curr_group == nil {
+			break
 		}
-	} else {
-		log.Printf("Unable to update UPS on %s", u.parent.hostpath)
+		switch curr_group.Data {
+		case "span":
+			if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "caption" {
+				label_group = curr_group
+			}
+		case "div":
+			if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "gap" {
+				process_ups_group(curr_group, label_group, &u)
+
+			}
+		}
+
+		curr_group = curr_group.NextSibling
 	}
 
+	return nil
+
+}
+
+func (u UPS) getParent() CyberPower {
+	return u.parent
 }
 
 func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
