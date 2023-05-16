@@ -45,7 +45,7 @@ jobs:
         uses: redhat-actions/buildah-build@v2
         if: ${{steps.release.outputs.version != null}}
         with:
-          containerfiles: Dockerfile
+          containerfiles: ./pkg/Containerfile
           context: ./dist/
           oci: true
           image: cyber_power
