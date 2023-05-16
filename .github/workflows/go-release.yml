@@ -1,0 +1,74 @@
+name: Go - Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Fetch all tags
+        run: |
+          git fetch --force --tags
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Build Package
+        id: build
+        run: |
+          go build -a -tags netgo -ldflags '-w -s' -o ./dist/cyber_power ./
+        env:
+          CGO_ENABLED: 0
+
+      - name: Make Release
+        uses: go-semantic-release/action@v1
+        id: release
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          allow-initial-development-versions: true
+
+      - name: Build Container Image
+        id: podman
+        uses: redhat-actions/buildah-build@v2
+        if: ${{steps.release.outputs.version != null}}
+        with:
+          containerfiles: Dockerfile
+          context: ./dist/
+          oci: true
+          image: cyber_power
+          tags: |
+            latest
+            v${{steps.release.outputs.version_major}} 
+            v${{steps.release.outputs.version_major}}.${{steps.release.outputs.version_minor}}
+            v${{steps.release.outputs.version}}
+          labels: |
+            org.opencontainers.image.url="${{github.server_url}}/${{github.repository}}
+            org.opencontainers.image.author="${{github.server_url}}/${{github.repository_owner}}
+            org.opencontainers.image.created=${{github.event.head_commit.timestamp}}
+            org.opencontainers.image.title=cyber_power
+            org.opencontainers.image.revision=${{github.sha}}
+            org.opencontainers.image.version=${{steps.version.outputs.version_tag}}
+            org.opencontainers.image.description=Rest API for Cyberpower UPS
+
+      - name: Push image
+        id: push
+        uses: redhat-actions/push-to-registry@v2
+        if: ${{steps.release.outputs.version != null}}
+        with:
+          image: ${{ steps.podman.outputs.image }}
+          registry: ghcr.io/${{ github.repository_owner }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          tags: ${{ steps.podman.outputs.tags }}
