@@ -106,7 +106,7 @@ var (
 		return gock.NewRequest().URL(testhostpath).Get("/login_counter.html").MatchParam("stap", "2")
 	}
 	reqLoginCgi = func() *gock.Request {
-		return gock.NewRequest().URL(testhostpath).Get("/login.cgi").MatchParam("action", "LOGIN")
+		return gock.NewRequest().URL(testhostpath).Get("/login.cgi").MatchParam("action", LoginAction)
 	}
 	reqLogoutHTML       = func() *gock.Request { return gock.NewRequest().URL(testhostpath).Get("/logout.html") }
 	respGenericOk       = func() *gock.Response { return gock.NewResponse().Status(http.StatusOK).BodyString("") }

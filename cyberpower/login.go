@@ -32,7 +32,6 @@ func (c *CP) login() error {
 		return fmt.Errorf("unable to read login_pass.cgi: %w", err)
 	}
 
-	// resp, err = c.client.Get(c.hostpath + "/login_pass.html?action=LOGIN&username=" + c.loginForm.Get("username") + "&password=" + c.loginForm.Get("password"))
 	resp, err = c.client.Get(c.hostpath + "/login_pass.html")
 	if err != nil {
 		return fmt.Errorf("unable to get login_pass.html: %w", err)
@@ -87,7 +86,7 @@ func (c *CP) login() error {
 		}
 	}
 
-	resp, err = c.client.Get(c.hostpath + "/login.cgi?action=LOGIN")
+	resp, err = c.client.Get(c.hostpath + fmt.Sprintf("/login.cgi?action=%s", LoginAction))
 	if err != nil {
 		return fmt.Errorf("unable to get login.cgi: %w", err)
 	}

@@ -41,7 +41,7 @@ func NewCyberPower(host string, username string, password string, validate bool)
 	c := &CP{}
 	c.hostpath = "http://" + host
 	c.loginForm = url.Values{}
-	c.loginForm.Set("action", "LOGIN")
+	c.loginForm.Set("action", LoginAction)
 	c.loginForm.Set("username", username)
 	c.loginForm.Set("password", password)
 

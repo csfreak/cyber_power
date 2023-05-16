@@ -9,4 +9,7 @@ const (
 	secInMin                           int    = 60
 	expectedRemainingRuntimeRegexMatch int    = 2
 	expectedTemperatureRegexMatch      int    = 3
+
+	// Login variables
+	LoginAction string = "LOGIN"
 )

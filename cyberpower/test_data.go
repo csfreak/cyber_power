@@ -13,7 +13,7 @@ var (
 	testhostpath  = "http://" + testhostname
 	testpath      = "/test/path"
 	testloginform = url.Values{
-		"action":   []string{"LOGIN"},
+		"action":   []string{LoginAction},
 		"username": []string{testuser},
 		"password": []string{testpw},
 	}
