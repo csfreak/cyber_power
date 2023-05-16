@@ -10,7 +10,7 @@ import (
 
 var apiListenerPort = ":8080"
 
-//var configfilepath = "/etc/cyberpower/config.yaml"
+// var configfilepath = "/etc/cyberpower/config.yaml"
 
 func main() {
 	if os.Getenv("CYBERPOWER_PORT") != "" {
@@ -39,6 +39,6 @@ func main() {
 
 	log.Printf("Starting HTTP Server on %s", apiListenerPort)
 
-	//Log and Exit if http server exits
+	// Log and Exit if http server exits
 	log.Fatal(http.ListenAndServe(apiListenerPort, nil))
 }

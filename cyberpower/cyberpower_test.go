@@ -1,27 +1,17 @@
 package cyberpower
 
 import (
+	"errors"
 	"fmt"
-	"net/url"
+	"net/http"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	_ "github.com/golang/mock/mockgen/model"
 	"github.com/h2non/gock"
 	"golang.org/x/net/html"
-)
-
-var (
-	testhostname  string     = "testhost"
-	testuser      string     = "testuser"
-	testpw        string     = "testpw"
-	testhostpath  string     = "http://" + testhostname
-	testpath      string     = "/test/path"
-	testloginform url.Values = url.Values{
-		"action":   []string{"LOGIN"},
-		"username": []string{testuser},
-		"password": []string{testpw},
-	}
 )
 
 func TestNewCyberPower(t *testing.T) {
@@ -31,7 +21,8 @@ func TestNewCyberPower(t *testing.T) {
 		password string
 		validate bool
 	}
-	default_args := args{testhostname, testuser, testpw, false}
+
+	defaultArgs := args{testhostname, testuser, testpw, false}
 
 	tests := []struct {
 		name  string
@@ -40,7 +31,7 @@ func TestNewCyberPower(t *testing.T) {
 	}{
 		{
 			"hostpath set",
-			default_args,
+			defaultArgs,
 			func(got *CP, err error) {
 				if got.hostpath != testhostpath {
 					t.Errorf("expected hostpath %s found %s", testhostpath, got.hostpath)
@@ -49,7 +40,7 @@ func TestNewCyberPower(t *testing.T) {
 		},
 		{
 			"loginform set",
-			default_args,
+			defaultArgs,
 			func(got *CP, err error) {
 				if !reflect.DeepEqual(got.loginForm, testloginform) {
 					t.Errorf("expected loginform %v found %v", testloginform, got.loginForm)
@@ -58,7 +49,7 @@ func TestNewCyberPower(t *testing.T) {
 		},
 		{
 			"env set",
-			default_args,
+			defaultArgs,
 			func(got *CP, err error) {
 				if got.env.getParent() != got {
 					t.Errorf("expected env.parent to be set, found %v", got.env)
@@ -67,7 +58,7 @@ func TestNewCyberPower(t *testing.T) {
 		},
 		{
 			"ups set",
-			default_args,
+			defaultArgs,
 			func(got *CP, err error) {
 				if got.ups.getParent() != got {
 					t.Errorf("expected env.parent to be set, found %v", got.ups)
@@ -75,11 +66,11 @@ func TestNewCyberPower(t *testing.T) {
 			},
 		},
 		{
-			"logged_in false",
-			default_args,
+			"loggedIn false",
+			defaultArgs,
 			func(got *CP, err error) {
-				if got._logged_in {
-					t.Errorf("expected logged_in to be false, found %v", got._logged_in)
+				if got._loggedIn {
+					t.Errorf("expected loggedIn to be false, found %v", got._loggedIn)
 				}
 			},
 		},
@@ -101,10 +92,11 @@ func TestNewCyberPower(t *testing.T) {
 	}
 }
 
-func TestCP_logged_in(t *testing.T) {
+func TestCP_loggedIn(t *testing.T) {
 	type fields struct {
-		_logged_in bool
+		_loggedIn bool
 	}
+
 	tests := []struct {
 		name   string
 		fields fields
@@ -113,13 +105,14 @@ func TestCP_logged_in(t *testing.T) {
 		{"logged in", fields{true}, true},
 		{"not loggedin", fields{false}, false},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &CP{
-				_logged_in: tt.fields._logged_in,
+				_loggedIn: tt.fields._loggedIn,
 			}
-			if got := c.logged_in(); got != tt.want {
-				t.Errorf("CP.logged_in() = %v, want %v", got, tt.want)
+			if got := c.loggedIn(); got != tt.want {
+				t.Errorf("CP.loggedIn() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -140,10 +133,10 @@ func TestCP_getEnv(t *testing.T) {
 	testenv := &ENV{}
 	tests := []struct {
 		name  string
-		env   CyberPowerModule
-		check func(got CyberPowerModule, ok bool)
+		env   CPModule
+		check func(got CPModule, ok bool)
 	}{
-		{"env type", testenv, func(got CyberPowerModule, ok bool) {
+		{"env type", testenv, func(got CPModule, ok bool) {
 			if !ok {
 				t.Errorf("failed get env")
 			}
@@ -151,13 +144,13 @@ func TestCP_getEnv(t *testing.T) {
 				t.Errorf("expected %v, got %v", testenv, got)
 			}
 		}},
-		{"ups type", &UPS{}, func(got CyberPowerModule, ok bool) {
+		{"ups type", &UPS{}, func(got CPModule, ok bool) {
 			if ok {
 				t.Errorf("expected error for type assertion, found none")
 			}
-
 		}},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &CP{
@@ -172,10 +165,10 @@ func TestCP_getUps(t *testing.T) {
 	testups := &UPS{}
 	tests := []struct {
 		name  string
-		ups   CyberPowerModule
-		check func(got CyberPowerModule, ok bool)
+		ups   CPModule
+		check func(got CPModule, ok bool)
 	}{
-		{"ups type", testups, func(got CyberPowerModule, ok bool) {
+		{"ups type", testups, func(got CPModule, ok bool) {
 			if !ok {
 				t.Errorf("failed get ups")
 			}
@@ -183,13 +176,13 @@ func TestCP_getUps(t *testing.T) {
 				t.Errorf("expected %v, got %v", testups, got)
 			}
 		}},
-		{"env type", &ENV{}, func(got CyberPowerModule, ok bool) {
+		{"env type", &ENV{}, func(got CPModule, ok bool) {
 			if ok {
 				t.Errorf("expected error for type assertion, found none")
 			}
-
 		}},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &CP{
@@ -201,11 +194,11 @@ func TestCP_getUps(t *testing.T) {
 }
 
 func TestCP_update(t *testing.T) {
-
 	type fields struct {
-		ups *mock_cpmodule
-		env *mock_cpmodule
+		ups *mockCpModule
+		env *mockCpModule
 	}
+
 	tests := []struct {
 		name  string
 		f     fields
@@ -214,16 +207,17 @@ func TestCP_update(t *testing.T) {
 		{
 			"update success",
 			fields{
-				ups: &mock_cpmodule{update_error: nil},
-				env: &mock_cpmodule{update_error: nil}},
+				ups: &mockCpModule{updateErr: nil},
+				env: &mockCpModule{updateErr: nil},
+			},
 			func(f fields, err error) {
 				if err != nil {
 					t.Errorf("expected no error, found %v", err)
 				}
-				if !f.ups.called_once() {
+				if !f.ups.calledOnce() {
 					t.Errorf("expected ups update called once, found %d", f.ups.calls())
 				}
-				if !f.env.called_once() {
+				if !f.env.calledOnce() {
 					t.Errorf("expected env update called once, found %d", f.env.calls())
 				}
 			},
@@ -231,13 +225,14 @@ func TestCP_update(t *testing.T) {
 		{
 			"update ups failed",
 			fields{
-				ups: &mock_cpmodule{update_error: fmt.Errorf("ups update failed")},
-				env: &mock_cpmodule{update_error: nil}},
+				ups: &mockCpModule{updateErr: fmt.Errorf("ups update failed")},
+				env: &mockCpModule{updateErr: nil},
+			},
 			func(f fields, err error) {
 				if err == nil {
 					t.Error("expected error, none found")
 				}
-				if !f.ups.called_once() {
+				if !f.ups.calledOnce() {
 					t.Errorf("expected ups update called once, found %d", f.ups.calls())
 				}
 			},
@@ -245,24 +240,26 @@ func TestCP_update(t *testing.T) {
 		{
 			"update env failed",
 			fields{
-				ups: &mock_cpmodule{update_error: nil},
-				env: &mock_cpmodule{update_error: fmt.Errorf("env update failed")}},
+				ups: &mockCpModule{updateErr: nil},
+				env: &mockCpModule{updateErr: fmt.Errorf("env update failed")},
+			},
 			func(f fields, err error) {
 				if err == nil {
 					t.Error("expected error, none found")
 				}
-				if !f.env.called_once() {
+				if !f.env.calledOnce() {
 					t.Errorf("expected env update called once, found %d", f.env.calls())
 				}
 			},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &CP{
-				ups:        tt.f.ups,
-				env:        tt.f.env,
-				_logged_in: false,
+				ups:       tt.f.ups,
+				env:       tt.f.env,
+				_loggedIn: false,
 			}
 			tt.check(tt.f, c.update())
 		})
@@ -272,70 +269,222 @@ func TestCP_update(t *testing.T) {
 func TestCP_get(t *testing.T) {
 	c, _ := NewCyberPower(testhostname, testuser, testpw, false)
 	cp := c.(*CP)
+
 	gock.InterceptClient(&cp.client)
 	defer gock.RestoreClient(&cp.client)
 	defer gock.Off()
 
 	tests := []struct {
-		name      string
-		path      string
-		logged_in bool
-		body      *Body
-		resp_code int
-		resp_err  error
-		wantErr   bool
+		name     string
+		path     string
+		loggedIn bool
+		body     *Body
+		respCode int
+		respErr  error
+		wantErr  bool
 	}{
 		{
-			"get empty body",
-			testpath,
-			true,
-			&Body{body: ""},
-			200,
-			nil,
-			false,
+			name:     "get empty body",
+			path:     testpath,
+			loggedIn: true,
+			body:     &Body{body: ""},
+			respCode: http.StatusOK,
+			respErr:  nil,
+			wantErr:  false,
 		},
 		{
-			"get full body",
-			testpath,
-			true,
-			&Body{body: htmlUpsStatusBody},
-			200,
-			nil,
-			false,
+			name:     "get full body",
+			path:     testpath,
+			loggedIn: true,
+			body:     &Body{body: ""},
+			respCode: http.StatusOK,
+			respErr:  nil,
+			wantErr:  false,
+		},
+		{
+			name:     "get 404",
+			path:     testpath,
+			loggedIn: true,
+			body:     &Body{body: ""},
+			respCode: http.StatusNotFound,
+			respErr:  nil,
+			wantErr:  false,
+		},
+		{
+			name:     "get login failed",
+			path:     testpath,
+			loggedIn: false,
+			body:     nil,
+			respCode: http.StatusOK,
+			respErr:  nil,
+			wantErr:  true,
+		},
+		{
+			name:     "get dial error",
+			path:     testpath,
+			loggedIn: true,
+			body:     nil,
+			respCode: 0,
+			respErr:  fmt.Errorf("dial error"),
+			wantErr:  true,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			want, parseErr := html.Parse(tt.body)
-			tt.body.Reset()
-			req := gock.New(testhostpath).Get(tt.path)
-			if tt.resp_err != nil {
-				req.ReplyError(tt.resp_err)
-			} else {
-				req.Reply(tt.resp_code).Body(tt.body)
+			defer gock.Flush()
+			defer gock.CleanUnmatchedRequest()
+
+			var want *html.Node
+
+			if tt.body != nil {
+				want, _ = html.Parse(tt.body)
+				tt.body.Reset()
 			}
-			cp._logged_in = tt.logged_in
+
+			req := gock.New(testhostpath).Get(tt.path)
+			if tt.respErr != nil {
+				req.ReplyError(tt.respErr)
+			} else if tt.body != nil {
+				req.Reply(tt.respCode).Body(tt.body)
+			}
+			cp._loggedIn = tt.loggedIn
 			got, err := c.get(tt.path)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("got error %v, expected %v", err, tt.wantErr)
 			}
-			if err != tt.resp_err {
-				t.Errorf("expected response error %v, got %v", tt.resp_err, err)
+			if tt.respErr != nil && !errors.Is(err, tt.respErr) {
+				t.Errorf("expected response error %v, got %v", tt.respErr, err)
 			}
-			if err != parseErr {
-				t.Errorf("expected parse errer %v, got %v", parseErr, err)
-			}
-			if !reflect.DeepEqual(got, want) {
-				t.Errorf("expected CyberPower.get() = %v, got  %v", want, got)
-			}
-			if req.Counter != 0 {
-				t.Errorf("missing calls: %d", req.Counter)
-			}
-			if gock.HasUnmatchedRequest() {
-				for _, r := range gock.GetUnmatchedRequests() {
-					t.Errorf("unexpected request: %v", r)
+
+			if want != nil {
+				if !reflect.DeepEqual(got, want) {
+					t.Errorf("expected CyberPower.get() = %v, got  %v", want, got)
+				}
+				if req.Counter != 0 {
+					t.Errorf("missing calls: %d", req.Counter)
+				}
+				if gock.HasUnmatchedRequest() {
+					for _, r := range gock.GetUnmatchedRequests() {
+						t.Errorf("unexpected request: %v", r)
+					}
 				}
 			}
+		})
+	}
+}
+
+func TestFromENV(t *testing.T) {
+	tests := []struct {
+		name     string
+		env      map[string]string
+		validate bool
+		check    func(got CyberPower, err error)
+	}{
+		{
+			"TestFromEnv success",
+			map[string]string{
+				"CYBERPOWER_HOST":     testhostname,
+				"CYBERPOWER_USERNAME": testuser,
+				"CYBERPOWER_PASSWORD": testpw,
+			},
+			false,
+			func(got CyberPower, err error) {
+				if err != nil {
+					t.Errorf("expected no error; found %v", err)
+				}
+				gotcp, ok := got.(*CP)
+				if !ok {
+					t.Errorf("expected *CP, got %v", reflect.TypeOf(got))
+				}
+				if gotcp.hostpath != testhostpath {
+					t.Errorf("epected hostpath %s; found %s", testhostpath, gotcp.hostpath)
+				}
+				if gotcp.loginForm.Get("username") != testuser {
+					t.Errorf("epected username %s; found %s", testuser, gotcp.loginForm.Get("username"))
+				}
+				if gotcp.loginForm.Get("password") != testpw {
+					t.Errorf("epected password %s; found %s", testpw, gotcp.loginForm.Get("password"))
+				}
+			},
+		},
+		{
+			"TestFromEnv no host",
+			map[string]string{
+				"CYBERPOWER_HOST":     "UNSET",
+				"CYBERPOWER_USERNAME": testuser,
+				"CYBERPOWER_PASSWORD": testpw,
+			},
+			false,
+			func(got CyberPower, err error) {
+				if err == nil || !strings.Contains(err.Error(), "CYBERPOWER_HOST") {
+					t.Errorf("expected error %v, found %v", fmt.Errorf("unable to load CYBERPOWER_HOST"), err)
+				}
+				if got != nil {
+					t.Errorf("expected nil, got %v", got)
+				}
+			},
+		},
+		{
+			"TestFromEnv no user",
+			map[string]string{
+				"CYBERPOWER_HOST":     testhostname,
+				"CYBERPOWER_USERNAME": "UNSET",
+				"CYBERPOWER_PASSWORD": testpw,
+			},
+			false,
+			func(got CyberPower, err error) {
+				if err == nil || !strings.Contains(err.Error(), "CYBERPOWER_USERNAME") {
+					t.Errorf("expected error %v, found %v", fmt.Errorf("unable to load CYBERPOWER_USERNAME"), err)
+				}
+				if got != nil {
+					t.Errorf("expected nil, got %v", got)
+				}
+			},
+		},
+		{
+			"TestFromEnv no password",
+			map[string]string{
+				"CYBERPOWER_HOST":     testhostname,
+				"CYBERPOWER_USERNAME": testuser,
+				"CYBERPOWER_PASSWORD": "UNSET",
+			},
+			false,
+			func(got CyberPower, err error) {
+				if err == nil || !strings.Contains(err.Error(), "CYBERPOWER_PASSWORD") {
+					t.Errorf("expected error %v, found %v", fmt.Errorf("unable to load CYBERPOWER_PASSWORD"), err)
+				}
+				if got != nil {
+					t.Errorf("expected nil, got %v", got)
+				}
+			},
+		},
+		{
+			"TestFromEnv failed validation",
+			map[string]string{
+				"CYBERPOWER_HOST":     testhostname,
+				"CYBERPOWER_USERNAME": testuser,
+				"CYBERPOWER_PASSWORD": testpw,
+			},
+			true,
+			func(got CyberPower, err error) {
+				if err == nil || !strings.Contains(err.Error(), "login") {
+					t.Errorf("expected error %v, found %v", fmt.Errorf("unable to login"), err)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				if v != "UNSET" {
+					t.Setenv(k, v)
+				} else {
+					os.Unsetenv(k)
+				}
+			}
+			got, err := FromENV(tt.validate)
+			tt.check(got, err)
 		})
 	}
 }

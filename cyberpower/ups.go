@@ -10,195 +10,209 @@ import (
 	"golang.org/x/net/html"
 )
 
-var ups_path = "/status_update.html"
-var runtime_regex = regexp.MustCompile(`^([0-9]+)min.`)
-var temperature_regex = regexp.MustCompile(`^([0-9]+)°C([0-9]+)°F`)
+var (
+	upsPath          = "/status_update.html"
+	runtimeRegex     = regexp.MustCompile(`^([0-9]+)min.`)
+	temperatureRegex = regexp.MustCompile(`^([0-9]+)°C([0-9]+)°F`)
+)
 
-func (u UPS) update() error {
-	root, err := u.parent.get(ups_path)
+func (u *UPS) update() error {
+	root, err := u.parent.get(upsPath)
 	if err != nil {
-		return fmt.Errorf("unable to update UPS on %s; %v", u.parent.getHost(), err)
+		return fmt.Errorf("unable to update UPS on %s; %w", u.parent.getHost(), err)
 	}
-	body := root.FirstChild.LastChild
 
-	curr_group := body.FirstChild
-	var label_group *html.Node
+	body := root.FirstChild.LastChild
+	currentGroup := body.FirstChild
+
+	var labelGroup *html.Node
+
 	for {
-		if curr_group == nil {
+		if currentGroup == nil {
 			break
 		}
-		switch curr_group.Data {
+
+		switch currentGroup.Data {
 		case "span":
-			if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "caption" {
-				label_group = curr_group
+			if currentGroup.Attr[0].Key == parseAttrKey && currentGroup.Attr[0].Val == "caption" {
+				labelGroup = currentGroup
 			}
 		case "div":
-			if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "gap" {
-				process_ups_group(curr_group, label_group, &u)
-
+			if currentGroup.Attr[0].Key == parseAttrKey && currentGroup.Attr[0].Val == "gap" {
+				processUpsGroup(currentGroup, labelGroup, u)
 			}
 		}
 
-		curr_group = curr_group.NextSibling
+		currentGroup = currentGroup.NextSibling
 	}
 
 	return nil
-
 }
 
 func (u UPS) getParent() CyberPower {
 	return u.parent
 }
 
-func process_ups_group(group *html.Node, label_group *html.Node, u *UPS) {
-	curr_item := group.FirstChild
-	var label_item *html.Node
+func processUpsGroup(group *html.Node, labelGroup *html.Node, u *UPS) {
+	currentItem := group.FirstChild
+
+	var labelItem *html.Node
+
 	for {
-		if curr_item == nil {
+		if currentItem == nil {
 			break
 		}
-		if len(curr_item.Attr) == 0 {
-			curr_item = curr_item.NextSibling
-			continue
-		} else if curr_item.Attr[0].Key == "class" && strings.Trim(curr_item.Attr[0].Val, " ") == "hide" {
-			curr_item = curr_item.NextSibling
-			continue
-		} else if curr_item.Attr[0].Key == "class" && strings.Trim(curr_item.Attr[0].Val, " ") == "lb statusLb" {
-			label_item = curr_item
-		} else if curr_item.Attr[0].Key == "class" && strings.Trim(curr_item.Attr[0].Val, " ") == "txt" {
-			if !(label_item == nil) {
-				switch label_item.FirstChild.Data {
+
+		switch {
+		case len(currentItem.Attr) == 0:
+		case currentItem.Attr[0].Key == parseAttrKey && strings.Trim(currentItem.Attr[0].Val, " ") == "hide":
+		case currentItem.Attr[0].Key == parseAttrKey && strings.Trim(currentItem.Attr[0].Val, " ") == "lb statusLb":
+			labelItem = currentItem
+		case currentItem.Attr[0].Key == parseAttrKey && strings.Trim(currentItem.Attr[0].Val, " ") == "txt":
+			if !(labelItem == nil) {
+				switch labelItem.FirstChild.Data {
 				case "Status":
-					switch label_group.FirstChild.Data {
-					case "Input":
-						u.Input.Status = curr_item.FirstChild.Data
-					case "Output":
-						u.Output.Status = curr_item.FirstChild.Data
-					case "Battery":
-						u.Battery.Status = curr_item.FirstChild.Data
+					switch labelGroup.FirstChild.Data {
+					case parseInputKey:
+						u.Input.Status = currentItem.FirstChild.Data
+					case parseOutputKey:
+						u.Output.Status = currentItem.FirstChild.Data
+					case parseBatteryKey:
+						u.Battery.Status = currentItem.FirstChild.Data
 					case "System":
-						u.Status = curr_item.FirstChild.Data
+						u.Status = currentItem.FirstChild.Data
 					}
 				case "Remaining Capacity":
-					cs := curr_item.FirstChild.Data
+					cs := currentItem.FirstChild.Data
 					cs = strings.Split(cs, " ")[0]
+
 					rc, err := strconv.Atoi(cs)
 					if err != nil {
-						log.Printf("Unable to parse Remaining Capacity for %s", label_group.FirstChild.Data)
+						log.Printf("Unable to parse Remaining Capacity for %s", labelGroup.FirstChild.Data)
 						break
 					}
-					switch label_group.FirstChild.Data {
-					case "Battery":
+
+					if labelGroup.FirstChild.Data == parseBatteryKey {
 						u.Battery.RemainingCapacity = rc
 					}
 				case "Remaining Runtime":
-					rs := runtime_regex.FindStringSubmatch(curr_item.FirstChild.Data)
-					if len(rs) < 2 {
-						log.Printf("Unable to parse Remaining Runtime for %s", label_group.FirstChild.Data)
+					rs := runtimeRegex.FindStringSubmatch(currentItem.FirstChild.Data)
+					if len(rs) < expectedRemainingRuntimeRegexMatch {
+						log.Printf("Unable to parse Remaining Runtime for %s", labelGroup.FirstChild.Data)
 						break
 					}
+
 					rr, err := strconv.Atoi(rs[1])
-					rr = rr * 60
 					if err != nil {
-						log.Printf("Unable to parse Remaining Runtime for %s", label_group.FirstChild.Data)
+						log.Printf("Unable to parse Remaining Runtime for %s", labelGroup.FirstChild.Data)
 						break
 					}
-					switch label_group.FirstChild.Data {
-					case "Battery":
+
+					if labelGroup.FirstChild.Data == parseBatteryKey {
+						rr *= secInMin
 						u.Battery.RemainingRuntime = rr
 					}
 				case "Temperature":
-					ts := temperature_regex.FindStringSubmatch(curr_item.FirstChild.Data)
-					if len(ts) != 3 {
-						log.Printf("Unable to parse Tempurature for %s", label_group.FirstChild.Data)
+					ts := temperatureRegex.FindStringSubmatch(currentItem.FirstChild.Data)
+					if len(ts) != expectedTemperatureRegexMatch {
+						log.Printf("Unable to parse Tempurature for %s", labelGroup.FirstChild.Data)
 						break
 					}
+
 					tc, err := strconv.Atoi(ts[1])
 					if err != nil {
-						log.Printf("Unable to parse Tempurature for %s", label_group.FirstChild.Data)
+						log.Printf("Unable to parse Tempurature for %s", labelGroup.FirstChild.Data)
 						break
 					}
+
 					tf, err := strconv.Atoi(ts[2])
-
 					if err != nil {
-						log.Printf("Unable to parse Tempurature for %s", label_group.FirstChild.Data)
+						log.Printf("Unable to parse Tempurature for %s", labelGroup.FirstChild.Data)
 						break
 					}
-					switch label_group.FirstChild.Data {
-					case "System":
-						u.Temp_c = tc
-						u.Temp_f = tf
-					}
 
+					if labelGroup.FirstChild.Data == "System" {
+						u.TempC = tc
+						u.TempF = tf
+					}
 				}
 			}
-		} else if curr_item.Attr[0].Key == "class" && strings.Trim(curr_item.Attr[0].Val, " ") == "firstData" {
-			if !(label_item == nil) {
-				switch label_item.FirstChild.Data {
+		case currentItem.Attr[0].Key == parseAttrKey && strings.Trim(currentItem.Attr[0].Val, " ") == "firstData":
+			if !(labelItem == nil) {
+				switch labelItem.FirstChild.Data {
 				case "Voltage":
-					vs := curr_item.FirstChild.Data
+					vs := currentItem.FirstChild.Data
 					vs = strings.Split(vs, " ")[0]
+
 					v, err := strconv.ParseFloat(vs, 64)
 					if err != nil {
-						log.Printf("Unable to parse Voltage for %s", label_group.FirstChild.Data)
+						log.Printf("Unable to parse Voltage for %s", labelGroup.FirstChild.Data)
 						break
 					}
-					switch label_group.FirstChild.Data {
-					case "Input":
+
+					switch labelGroup.FirstChild.Data {
+					case parseInputKey:
 						u.Input.Voltage = v
-					case "Output":
+					case parseOutputKey:
 						u.Output.Voltage = v
 					}
 				case "Frequency":
-					fs := curr_item.FirstChild.Data
+					fs := currentItem.FirstChild.Data
 					fs = strings.Split(fs, " ")[0]
+
 					f, err := strconv.ParseFloat(fs, 64)
 					if err != nil {
-						log.Printf("Unable to parse Frequency for %s", label_group.FirstChild.Data)
+						log.Printf("Unable to parse Frequency for %s", labelGroup.FirstChild.Data)
 						break
 					}
-					switch label_group.FirstChild.Data {
-					case "Input":
+
+					switch labelGroup.FirstChild.Data {
+					case parseInputKey:
 						u.Input.Frequency = f
-					case "Output":
+					case parseOutputKey:
 						u.Output.Frequency = f
 					}
 				case "Current":
-					cs := curr_item.FirstChild.Data
+					cs := currentItem.FirstChild.Data
 					cs = strings.Split(cs, " ")[0]
+
 					c, err := strconv.ParseFloat(cs, 64)
 					if err != nil {
-						log.Printf("Unable to parse Current for %s", label_group.FirstChild.Data)
+						log.Printf("Unable to parse Current for %s", labelGroup.FirstChild.Data)
 						break
 					}
-					switch label_group.FirstChild.Data {
-					case "Output":
+
+					if labelGroup.FirstChild.Data == parseOutputKey {
 						u.Output.Current = c
 					}
 				case "Load":
-					ls := curr_item.FirstChild.Data
+					ls := currentItem.FirstChild.Data
 					lsplit := strings.Split(ls, " ")
+
 					lp, err := strconv.Atoi(lsplit[0])
 					if err != nil {
-						log.Printf("Unable to parse Load Percent for %s", label_group.FirstChild.Data)
+						log.Printf("Unable to parse Load Percent for %s", labelGroup.FirstChild.Data)
 						break
 					}
+
 					lw, err := strconv.Atoi(strings.Trim(lsplit[2], "()"))
 					if err != nil {
-						log.Printf("Unable to parse Load Watts for %s", label_group.FirstChild.Data)
+						log.Printf("Unable to parse Load Watts for %s", labelGroup.FirstChild.Data)
 						break
 					}
-					switch label_group.FirstChild.Data {
-					case "Output":
+
+					if labelGroup.FirstChild.Data == parseOutputKey {
 						u.Output.LoadPercent = lp
 						u.Output.LoadWatts = lw
 					}
 				}
 			}
-		} else if curr_item.Attr[0].Key == "class" && strings.Trim(curr_item.Attr[0].Val, " ") == "" {
-			process_ups_group(curr_item, label_group, u)
+		case currentItem.Attr[0].Key == parseAttrKey && strings.Trim(currentItem.Attr[0].Val, " ") == "":
+			processUpsGroup(currentItem, labelGroup, u)
 		}
-		curr_item = curr_item.NextSibling
+
+		currentItem = currentItem.NextSibling
+
 		continue
 	}
 }

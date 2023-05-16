@@ -1,60 +1,86 @@
 package cyberpower
 
 import (
+	"fmt"
 	"io"
 	"log"
+	"net/http"
 )
 
-func (c *CP) login() bool {
+func (c *CP) login() error {
 	resp, err := c.client.Get(c.hostpath + "/login.html")
 	if err != nil {
-		log.Println(err)
-		return false
+		return fmt.Errorf("unable to get login.html: %w", err)
 	}
+
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+
+	_, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read login.html: %w", err)
+	}
 
 	resp, err = c.client.PostForm(c.hostpath+"/login_pass.cgi", c.loginForm)
 	if err != nil {
-		log.Println(err)
-		return false
+		return fmt.Errorf("unable to post login_pass.cgi: %w", err)
 	}
+
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+
+	_, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read login_pass.cgi: %w", err)
+	}
 
 	// resp, err = c.client.Get(c.hostpath + "/login_pass.html?action=LOGIN&username=" + c.loginForm.Get("username") + "&password=" + c.loginForm.Get("password"))
 	resp, err = c.client.Get(c.hostpath + "/login_pass.html")
 	if err != nil {
-		log.Println(err)
-		return false
+		return fmt.Errorf("unable to get login_pass.html: %w", err)
 	}
+
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+
+	_, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read login_pass.html: %w", err)
+	}
 
 	resp, err = c.client.Get(c.hostpath + "/login_counter.html?stap=0")
 	if err != nil {
-		log.Println(err)
-		return false
+		return fmt.Errorf("unable to get login_counter.html: %w", err)
 	}
+
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+
+	_, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read login_counter.html: %w", err)
+	}
 
 	resp, err = c.client.Get(c.hostpath + "/login_counter.html?stap=1")
 	if err != nil {
-		log.Println(err)
-		return false
+		return fmt.Errorf("unable to get login_counter.html: %w", err)
 	}
+
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+
+	_, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read login_counter.html: %w", err)
+	}
 
 	for {
 		resp, err = c.client.Get(c.hostpath + "/login_counter.html?stap=2")
 		if err != nil {
-			log.Println(err)
-			return false
+			return fmt.Errorf("unable to get login_counter.html: %w", err)
 		}
+
 		defer resp.Body.Close()
-		io.ReadAll(resp.Body)
+
+		_, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("unable to read login_counter.html: %w", err)
+		}
 
 		if resp.Header.Get("auth_state") == "1" {
 			break
@@ -63,25 +89,51 @@ func (c *CP) login() bool {
 
 	resp, err = c.client.Get(c.hostpath + "/login.cgi?action=LOGIN")
 	if err != nil {
-		log.Println(err)
-		return false
+		return fmt.Errorf("unable to get login.cgi: %w", err)
 	}
+
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
-	if resp.Header.Get("Location") == c.hostpath+"/error.html" {
-		log.Println("Login Failed")
-		return false
+
+	_, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read login.cgi: %w", err)
 	}
+
+	if resp.Header.Get("Location") == c.hostpath+"/error.html" {
+		return fmt.Errorf("login Failed")
+	}
+
 	log.Printf("Login Successful to %s", c.hostpath)
-	c._logged_in = true
-	return true
+
+	c._loggedIn = true
+
+	return nil
 }
 
-func (c *CP) logout() {
-	if !c._logged_in {
-		return
+func (c *CP) logout() error {
+	if !c._loggedIn {
+		return nil
 	}
-	c.client.Get(c.hostpath + "/logout.html")
+
+	resp, err := c.client.Get(c.hostpath + "/logout.html")
+	if err != nil {
+		return fmt.Errorf("unable to get logout.html: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	_, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read logout.html: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unable to logout")
+	}
+
 	log.Printf("Logout from %s", c.hostpath)
-	c._logged_in = false
+
+	c._loggedIn = false
+
+	return nil
 }
