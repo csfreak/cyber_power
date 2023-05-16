@@ -1,0 +1,26 @@
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - errcheck
+    - goconst
+    - gocritic
+    - gofumpt
+    - gomnd
+    - gomoddirectives
+    - gosimple
+    - govet
+    - ineffassign
+    - revive
+    - staticcheck
+    - typecheck
+    - unused
+    - usestdlibvars
+    - whitespace
+    - wrapcheck
+    - wsl
+linters-settings:
+  wrapcheck:
+    ignoreSigs:
+      - .Errorf(
+      - errors.New(

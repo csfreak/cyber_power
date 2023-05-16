@@ -1,6 +1,7 @@
 package cyberpower
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -8,103 +9,96 @@ import (
 	"golang.org/x/net/html"
 )
 
-type ENV struct {
-	parent   *CyberPower
-	Name     string
-	Location string
-	Temp_f   float64
-	Humidity int
-}
+var envPath = "/env_status_update.html"
 
-var env_path = "/env_status_update.html"
-
-func (e *ENV) update() {
-	root, err := e.parent.get(env_path)
-	if err == nil {
-
-		body := root.FirstChild.LastChild
-
-		curr_group := body.FirstChild
-		var label_group *html.Node
-		for {
-			if curr_group == nil {
-				break
-			}
-			switch curr_group.Data {
-			case "span":
-				if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "caption" {
-					label_group = curr_group
-				}
-			case "div":
-				if curr_group.Attr[0].Key == "class" && curr_group.Attr[0].Val == "gap" {
-					process_env_group(curr_group, label_group, e)
-
-				}
-			}
-
-			curr_group = curr_group.NextSibling
-		}
-	} else {
-		log.Printf("Unable to update ENV on %s", e.parent.hostpath)
+func (e *ENV) update() error {
+	root, err := e.parent.get(envPath)
+	if err != nil {
+		return fmt.Errorf("unable to update ENV on %s; %w", e.parent.getHost(), err)
 	}
-}
 
-func process_env_group(group *html.Node, label_group *html.Node, e *ENV) {
-	curr_item := group.FirstChild
-	var label_item *html.Node
+	body := root.FirstChild.LastChild
+	currentGroup := body.FirstChild
+
+	var labelGroup *html.Node
+
 	for {
-		if curr_item == nil {
+		if currentGroup == nil {
 			break
 		}
-		if len(curr_item.Attr) == 0 {
-			curr_item = curr_item.NextSibling
-			continue
-		} else if curr_item.Attr[0].Key == "class" && strings.Trim(curr_item.Attr[0].Val, " ") == "hide" {
-			curr_item = curr_item.NextSibling
-			continue
-		} else if curr_item.Attr[0].Key == "class" && strings.Trim(curr_item.Attr[0].Val, " ") == "lb env_statusLb" {
-			label_item = curr_item
-		} else if curr_item.Attr[0].Key == "class" && strings.Trim(curr_item.Attr[0].Val, " ") == "txt2" {
-			if !(label_item == nil) {
-				switch label_item.FirstChild.Data {
-				case "Name":
-					e.Name = curr_item.FirstChild.Data
-				case "Location":
-					e.Location = curr_item.FirstChild.Data
 
+		switch currentGroup.Data {
+		case "span":
+			if currentGroup.Attr[0].Key == parseAttrKey && currentGroup.Attr[0].Val == "caption" {
+				labelGroup = currentGroup
+			}
+		case "div":
+			if currentGroup.Attr[0].Key == parseAttrKey && currentGroup.Attr[0].Val == "gap" {
+				processEnvGroup(currentGroup, labelGroup, e)
+			}
+		}
+
+		currentGroup = currentGroup.NextSibling
+	}
+
+	return nil
+}
+
+func (e ENV) getParent() CyberPower {
+	return e.parent
+}
+
+func processEnvGroup(group *html.Node, labelGroup *html.Node, e *ENV) {
+	currentItem := group.FirstChild
+
+	var labelItem *html.Node
+
+ItemIter:
+	for {
+		switch {
+		case currentItem == nil:
+			break ItemIter
+		case len(currentItem.Attr) == 0:
+		case currentItem.Attr[0].Key == parseAttrKey && strings.Trim(currentItem.Attr[0].Val, " ") == "hide":
+		case currentItem.Attr[0].Key == parseAttrKey && strings.Trim(currentItem.Attr[0].Val, " ") == "lb env_statusLb":
+			labelItem = currentItem
+		case currentItem.Attr[0].Key == parseAttrKey && strings.Trim(currentItem.Attr[0].Val, " ") == "txt2":
+			if !(labelItem == nil) {
+				switch labelItem.FirstChild.Data {
+				case "Name":
+					e.Name = currentItem.FirstChild.Data
+				case "Location":
+					e.Location = currentItem.FirstChild.Data
 				}
 			}
-		} else if curr_item.Attr[0].Key == "class" && strings.Trim(curr_item.Attr[0].Val, " ") == "txt3" {
-			if !(label_item == nil) {
-				switch label_item.FirstChild.Data {
-				case "Current Value":
-					switch label_group.FirstChild.Data {
+		case currentItem.Attr[0].Key == parseAttrKey && strings.Trim(currentItem.Attr[0].Val, " ") == "txt3":
+			if !(labelItem == nil) {
+				if labelItem.FirstChild.Data == "Current Value" {
+					switch labelGroup.FirstChild.Data {
 					case "Temperature":
-						ts := curr_item.FirstChild.Data
+						ts := currentItem.FirstChild.Data
 						ts = strings.Trim(ts, " ")
 						t, err := strconv.ParseFloat(ts, 64)
 						if err != nil {
-							if !(curr_item.PrevSibling.Attr[0].Key == "class" && strings.Trim(curr_item.PrevSibling.Attr[0].Val, " ") == "txt3") {
-								log.Printf("Unable to parse Current Value for %s", label_group.FirstChild.Data)
+							if !(currentItem.PrevSibling.Attr[0].Key == parseAttrKey && strings.Trim(currentItem.PrevSibling.Attr[0].Val, " ") == "txt3") {
+								log.Printf("Unable to parse Temp Value for %s", labelGroup.FirstChild.Data)
 							}
 							break
 						}
-						e.Temp_f = t
+						e.TempF = t
 					case "Humidity":
-						hs := curr_item.FirstChild.Data
+						hs := currentItem.FirstChild.Data
 						hs = strings.Split(hs, " ")[0]
 						f, err := strconv.Atoi(hs)
 						if err != nil {
-							log.Printf("Unable to parse Current Value for %s", label_group.FirstChild.Data)
+							log.Printf("Unable to parse Humidity Value for %s", labelGroup.FirstChild.Data)
 							break
 						}
 						e.Humidity = f
 					}
-
 				}
 			}
 		}
-		curr_item = curr_item.NextSibling
-		continue
+		currentItem = currentItem.NextSibling
 	}
 }
