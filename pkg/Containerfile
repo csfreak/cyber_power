@@ -5,7 +5,7 @@ RUN apk update && apk add --no-cache ca-certificates && update-ca-certificates
 
 FROM scratch
 COPY --from=certificates /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY dist/cyber_power /app/cyber_power
+COPY cyber_power /app/cyber_power
 
 EXPOSE 8080
 WORKDIR /app
